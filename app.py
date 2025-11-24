@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime
+import email
+from email.policy import default
 
 app = Flask(__name__)
 
-# Database (In-Memory)
-# Structure: { "email@domain.com": [ {msg1}, {msg2} ] }
+# Database
 user_inboxes = {}
 
 HTML_PAGE = """
@@ -18,16 +19,12 @@ HTML_PAGE = """
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: {
-                extend: { colors: { brand: { 500: '#3b82f6', 600: '#2563eb' } } }
-            }
+            theme: { extend: { colors: { brand: { 500: '#3b82f6', 600: '#2563eb' } } } }
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .otp-badge { background: #facc15; color: black; padding: 2px 6px; border-radius: 4px; font-weight: 800; border: 1px solid #eab308; display: inline-block; cursor: pointer; margin: 0 2px; }
-        .modal-enter { transform: translateY(100%); opacity: 0; }
-        .modal-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -277,6 +274,48 @@ def webhook():
     data = request.json
     if data:
         now = datetime.now().strftime("%H:%M")
+        raw_body = data.get('body', '')
+        
+        # --- EMAIL PARSING LOGIC START ---
+        clean_body = raw_body
+        try:
+            # Parse the raw email
+            msg = email.message_from_string(raw_body, policy=default)
+            
+            # Extract Subject (Override header subject if available here)
+            if msg['subject']:
+                data['subject'] = msg['subject']
+            
+            # Extract Body
+            body_content = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    ctype = part.get_content_type()
+                    cdispo = str(part.get('Content-Disposition'))
+
+                    # Skip attachments
+                    if 'attachment' in cdispo:
+                        continue
+                    
+                    # Prefer HTML, then Plain Text
+                    if ctype == 'text/html':
+                        body_content = part.get_content()
+                        break 
+                    elif ctype == 'text/plain' and body_content == "":
+                        body_content = part.get_content()
+            else:
+                body_content = msg.get_content()
+
+            if body_content:
+                clean_body = body_content
+
+        except Exception as e:
+            print(f"Parsing error: {e}")
+            # If parsing fails, stick to raw body
+        
+        data['body'] = clean_body
+        # --- EMAIL PARSING LOGIC END ---
+
         data['timestamp'] = now
         recipient = data.get('recipient')
         
@@ -286,17 +325,11 @@ def webhook():
             
             user_inboxes[recipient].append(data)
             
-            # Keep max 50 emails per user to save memory
+            # Keep max 50 emails per user
             if len(user_inboxes[recipient]) > 50:
                 user_inboxes[recipient].pop(0)
             
     return jsonify({"status": "received"}), 200
 
 @app.route('/api/emails')
-def get_emails():
-    target = request.args.get('address')
-    my_msgs = user_inboxes.get(target, [])
-    return jsonify(my_msgs)
-
-if __name__ == '__main__':
-    app.run()
+def get
