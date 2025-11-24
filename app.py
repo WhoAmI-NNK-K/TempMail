@@ -4,13 +4,12 @@ import re
 app = Flask(__name__)
 
 # Server Memory (Temporary Storage)
-# Server Restart ကျရင် စာအဟောင်းတွေ ပျောက်သွားနိုင်ပေမယ့်
-# Email လိပ်စာအဟောင်းကို ပြန်သုံးပြီး စာအသစ်လက်ခံလို့ ရပါတယ်
 emails_db = []
 
 HTML_PAGE = """
 <!DOCTYPE html>
-<html lang="en" class="dark"> <head>
+<html lang="en" class="dark">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buffalo Admin | Premium Mail</title>
@@ -33,8 +32,6 @@ HTML_PAGE = """
         body { transition: background-color 0.3s, color 0.3s; }
         .glass-panel { backdrop-filter: blur(12px); transition: all 0.3s ease; }
         .otp-code { background-color: #facc15; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -74,8 +71,7 @@ HTML_PAGE = """
                 <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">History (Reuse Emails)</h3>
                 <button onclick="clearHistory()" class="text-xs text-red-500 hover:text-red-600"><i class="fa-solid fa-trash"></i> Clear</button>
             </div>
-            <div id="history-list" class="space-y-2 max-h-40 overflow-y-auto pr-2">
-                </div>
+            <div id="history-list" class="space-y-2 max-h-40 overflow-y-auto pr-2"></div>
         </div>
 
         <div class="bg-gray-50 dark:bg-slate-900/50 rounded-xl p-5 mb-6 border border-gray-200 dark:border-slate-700">
@@ -122,48 +118,38 @@ HTML_PAGE = """
         let currentEmail = "";
         let emailHistory = JSON.parse(localStorage.getItem("mail_history_v2")) || [];
 
-        // --- THEME LOGIC ---
         function initTheme() {
             const theme = localStorage.getItem('theme');
-            if (theme === 'light') {
-                document.documentElement.classList.remove('dark');
-            } else {
-                document.documentElement.classList.add('dark');
-            }
+            if (theme === 'light') { document.documentElement.classList.remove('dark'); } 
+            else { document.documentElement.classList.add('dark'); }
         }
 
         function toggleTheme() {
             const html = document.documentElement;
             if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
+                html.classList.remove('dark'); localStorage.setItem('theme', 'light');
             } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
+                html.classList.add('dark'); localStorage.setItem('theme', 'dark');
             }
         }
-        // ------------------
 
         function init() {
             initTheme();
-            // Load last email or create new
             const saved = localStorage.getItem("current_active_email");
             if (saved) {
                 currentEmail = saved;
-                addToHistory(saved); // Ensure it's in history
+                addToHistory(saved);
             } else {
                 createRandomEmail();
             }
             updateDisplay();
             updateHistoryUI();
-            
             setInterval(fetchEmails, 3000);
         }
 
         function createRandomEmail() {
             const randomStr = Math.random().toString(36).substring(7);
-            const newEmail = randomStr + "@" + DOMAIN;
-            setActiveEmail(newEmail);
+            setActiveEmail(randomStr + "@" + DOMAIN);
             showToast("New address created!");
         }
 
@@ -171,16 +157,13 @@ HTML_PAGE = """
             currentEmail = email;
             localStorage.setItem("current_active_email", currentEmail);
             addToHistory(email);
-            
-            // Reset Inbox UI
             document.getElementById("inbox").innerHTML = `
                 <div class="text-center py-12 opacity-40 animate-pulse">
                     <i class="fa-solid fa-satellite-dish text-4xl mb-4"></i>
                     <p class="text-sm">Listening for ${email}...</p>
                 </div>`;
-            
             updateDisplay();
-            fetchEmails(); // Check immediately
+            fetchEmails();
         }
 
         function addToHistory(email) {
@@ -195,21 +178,13 @@ HTML_PAGE = """
         function updateHistoryUI() {
             const list = document.getElementById("history-list");
             const countBadge = document.getElementById("history-count");
-            
             if (emailHistory.length > 0) {
                 countBadge.innerText = emailHistory.length;
                 countBadge.classList.remove("hidden");
-                
                 list.innerHTML = emailHistory.map(email => {
                     const isActive = email === currentEmail;
-                    return `
-                    <div onclick="restoreEmail('${email}')" 
-                        class="flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all border border-transparent
-                        ${isActive ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-500' : 'bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700'}">
-                        <span class="text-xs font-mono truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-600 dark:text-gray-400'}">${email}</span>
-                        ${isActive ? '<span class="text-[10px] bg-blue-500 text-white px-2 rounded-full">Active</span>' : '<i class="fa-solid fa-rotate-left text-gray-400 hover:text-blue-500"></i>'}
-                    </div>
-                `}).join('');
+                    return `<div onclick="restoreEmail('${email}')" class="flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all border border-transparent ${isActive ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-500' : 'bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700'}"><span class="text-xs font-mono truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-600 dark:text-gray-400'}">${email}</span>${isActive ? '<span class="text-[10px] bg-blue-500 text-white px-2 rounded-full">Active</span>' : '<i class="fa-solid fa-rotate-left text-gray-400 hover:text-blue-500"></i>'}</div>`
+                }).join('');
             } else {
                 countBadge.classList.add("hidden");
                 list.innerHTML = '<div class="text-center text-xs opacity-50 py-2">No history</div>';
@@ -219,31 +194,19 @@ HTML_PAGE = """
         function restoreEmail(email) {
             if (currentEmail === email) return;
             setActiveEmail(email);
-            toggleHistory(); // Close panel
+            toggleHistory();
             showToast("Restored: Waiting for codes...");
         }
 
         function clearHistory() {
             if(confirm("Clear all history?")) {
-                emailHistory = [];
-                localStorage.removeItem("mail_history_v2");
-                updateHistoryUI();
+                emailHistory = []; localStorage.removeItem("mail_history_v2"); updateHistoryUI();
             }
         }
 
-        function toggleHistory() {
-            document.getElementById("history-panel").classList.toggle("hidden");
-        }
-
-        function updateDisplay() {
-            document.getElementById("current-email").value = currentEmail;
-            updateHistoryUI(); // To update the "Active" highlight
-        }
-
-        function copyEmail() {
-            navigator.clipboard.writeText(currentEmail);
-            showToast("Copied to clipboard");
-        }
+        function toggleHistory() { document.getElementById("history-panel").classList.toggle("hidden"); }
+        function updateDisplay() { document.getElementById("current-email").value = currentEmail; updateHistoryUI(); }
+        function copyEmail() { navigator.clipboard.writeText(currentEmail); showToast("Copied to clipboard"); }
 
         function showToast(msg) {
             const toast = document.getElementById("toast");
@@ -256,45 +219,23 @@ HTML_PAGE = """
             if (!currentEmail) return;
             const icon = document.getElementById("refresh-icon");
             icon.classList.add("fa-spin");
-
             try {
                 const res = await fetch(`/api/emails?address=${currentEmail}`);
                 const data = await res.json();
                 const inbox = document.getElementById("inbox");
-
                 if (data.length > 0) {
                     inbox.innerHTML = data.reverse().map(msg => {
-                        let body = msg.body.replace(/</g, "&lt;"); 
-                        // Smart OTP Highlight
-                        body = body.replace(/\\b\\d{4,8}\\b/g, match => `<span class="otp-code">${match}</span>`);
-                        body = body.replace(/\\n/g, "<br>");
-
-                        return `
-                        <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 hover:border-blue-500 transition-all shadow-sm animate-fade-in">
-                            <div class="flex justify-between items-start mb-2 border-b border-gray-100 dark:border-slate-700 pb-2">
-                                <div class="font-bold text-sm truncate w-2/3">${msg.sender}</div>
-                                <span class="text-[10px] text-gray-500 bg-gray-100 dark:bg-slate-900 px-2 py-1 rounded">Just now</span>
-                            </div>
-                            <div class="text-blue-600 dark:text-blue-400 font-medium text-sm mb-2">${msg.subject}</div>
-                            <div class="text-gray-600 dark:text-gray-300 text-sm bg-gray-50 dark:bg-slate-900/50 p-3 rounded-lg font-mono overflow-x-auto">
-                                ${body}
-                            </div>
-                        </div>`;
+                        let body = msg.body.replace(/</g, "&lt;").replace(/\\b\\d{4,8}\\b/g, match => `<span class="otp-code">${match}</span>`).replace(/\\n/g, "<br>");
+                        return `<div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 hover:border-blue-500 transition-all shadow-sm animate-fade-in"><div class="flex justify-between items-start mb-2 border-b border-gray-100 dark:border-slate-700 pb-2"><div class="font-bold text-sm truncate w-2/3">${msg.sender}</div><span class="text-[10px] text-gray-500 bg-gray-100 dark:bg-slate-900 px-2 py-1 rounded">Just now</span></div><div class="text-blue-600 dark:text-blue-400 font-medium text-sm mb-2">${msg.subject}</div><div class="text-gray-600 dark:text-gray-300 text-sm bg-gray-50 dark:bg-slate-900/50 p-3 rounded-lg font-mono overflow-x-auto">${body}</div></div>`;
                     }).join("");
                 }
             } catch (e) { console.error(e); }
-            
             setTimeout(() => icon.classList.remove("fa-spin"), 500);
         }
-
-        // Fade In Animation
+        
         const style = document.createElement('style');
-        style.innerHTML = `
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        `;
+        style.innerHTML = `@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }`;
         document.head.appendChild(style);
-
         init();
     </script>
 </body>
@@ -310,110 +251,7 @@ def webhook():
     data = request.json
     if data:
         emails_db.append(data)
-        # Memory များမသွားအောင် ထိန်းသိမ်းခြင်း
-        if len(emails_db) > 200: emails_db.pop(0) 
-    return jsonify({"status": "received"}), 200
-
-@app.route('/api/emails')
-def get_emails():
-    target = request.args.get('address')
-    my_msgs = [m for m in emails_db if m.get('recipient') == target]
-    return jsonify(my_msgs)
-
-if __name__ == '__main__':
-    app.run()                    <p>Inbox cleared. Waiting for new emails...</p>
-                </div>`;
-            showToast("New address generated!");
-        }
-
-        function updateDisplay() {
-            if (!myEmail) generateNewEmail();
-            document.getElementById("current-email").value = myEmail;
-        }
-
-        // 2. Copy to Clipboard
-        function copyEmail() {
-            const copyText = document.getElementById("current-email");
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value);
-            showToast("Email address copied!");
-        }
-
-        // 3. Show Toast Notification
-        function showToast(msg) {
-            const toast = document.getElementById("toast");
-            document.getElementById("toast-msg").innerText = msg;
-            toast.classList.remove("translate-y-20", "opacity-0");
-            setTimeout(() => {
-                toast.classList.add("translate-y-20", "opacity-0");
-            }, 3000);
-        }
-
-        // 4. Fetch Emails & Parse Content
-        async function fetchEmails() {
-            if (!myEmail) return;
-            
-            const refreshIcon = document.getElementById("refresh-icon");
-            refreshIcon.classList.add("fa-spin");
-
-            try {
-                const res = await fetch(`/api/emails?address=${myEmail}`);
-                const data = await res.json();
-                
-                const inboxDiv = document.getElementById("inbox");
-
-                if (data.length > 0) {
-                    inboxDiv.innerHTML = data.reverse().map(msg => {
-                        // Clean up the body text
-                        let cleanBody = msg.body;
-                        
-                        // Try to extract useful text if it's messy
-                        // Simple cleanup: highlight numbers (OTP)
-                        cleanBody = cleanBody.replace(/\\b\\d{4,8}\\b/g, (match) => {
-                            return `<span class="otp-code">${match}</span>`;
-                        });
-                        
-                        // Convert newlines to HTML breaks
-                        cleanBody = cleanBody.replace(/\\n/g, "<br>");
-
-                        return `
-                        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-blue-500 transition-colors shadow-sm">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="font-bold text-white text-sm">${msg.sender}</div>
-                                <span class="text-xs text-gray-500 bg-slate-900 px-2 py-1 rounded">Just now</span>
-                            </div>
-                            <div class="text-blue-400 font-medium text-sm mb-3">${msg.subject}</div>
-                            <div class="text-gray-300 text-sm bg-slate-900 p-3 rounded-md font-mono overflow-x-auto whitespace-pre-wrap border border-slate-800">
-                                ${cleanBody}
-                            </div>
-                        </div>
-                        `;
-                    }).join("");
-                }
-            } catch (e) { console.error(e); }
-            
-            setTimeout(() => refreshIcon.classList.remove("fa-spin"), 500);
-        }
-
-        // Initialize
-        updateDisplay();
-        setInterval(fetchEmails, 3000); // Check every 3 seconds
-    </script>
-</body>
-</html>
-"""
-
-@app.route('/')
-def home():
-    return render_template_string(HTML_PAGE)
-
-@app.route('/api/webhook', methods=['POST'])
-def webhook():
-    data = request.json
-    if data:
-        emails_db.append(data)
-        if len(emails_db) > 100: emails_db.pop(0)
+        if len(emails_db) > 200: emails_db.pop(0)
     return jsonify({"status": "received"}), 200
 
 @app.route('/api/emails')
