@@ -332,4 +332,10 @@ def webhook():
     return jsonify({"status": "received"}), 200
 
 @app.route('/api/emails')
-def get
+def get_emails():
+    target = request.args.get('address')
+    my_msgs = user_inboxes.get(target, [])
+    return jsonify(my_msgs)
+
+if __name__ == '__main__':
+    app.run()
