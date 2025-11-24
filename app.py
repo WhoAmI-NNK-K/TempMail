@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime
 import email
 from email.policy import default
+import re
 
 app = Flask(__name__)
 
@@ -201,6 +202,7 @@ HTML_PAGE = """
             document.getElementById("read-subject").innerText = subject;
             document.getElementById("read-date").innerText = date;
             
+            // Smart OTP Highlight & Line Break Fix
             let formattedBody = body.replace(/</g, "&lt;");
             formattedBody = formattedBody.replace(/\\b\\d{4,8}\\b/g, match => `<span class="otp-badge" onclick="copyText('${match}', event)">${match}</span>`);
             formattedBody = formattedBody.replace(/\\n/g, "<br>");
@@ -276,58 +278,45 @@ def webhook():
         now = datetime.now().strftime("%H:%M")
         raw_body = data.get('body', '')
         
-        # --- EMAIL PARSING LOGIC START ---
+        # --- CLEANER LOGIC START ---
         clean_body = raw_body
         try:
-            # Parse the raw email
             msg = email.message_from_string(raw_body, policy=default)
+            if msg['subject']: data['subject'] = msg['subject']
             
-            # Extract Subject (Override header subject if available here)
-            if msg['subject']:
-                data['subject'] = msg['subject']
-            
-            # Extract Body
-            body_content = ""
+            text_part = ""
+            html_part = ""
+
             if msg.is_multipart():
                 for part in msg.walk():
                     ctype = part.get_content_type()
                     cdispo = str(part.get('Content-Disposition'))
-
-                    # Skip attachments
-                    if 'attachment' in cdispo:
-                        continue
+                    if 'attachment' in cdispo: continue
                     
-                    # Prefer HTML, then Plain Text
-                    if ctype == 'text/html':
-                        body_content = part.get_content()
-                        break 
-                    elif ctype == 'text/plain' and body_content == "":
-                        body_content = part.get_content()
+                    if ctype == 'text/plain': text_part = part.get_content()
+                    elif ctype == 'text/html': html_part = part.get_content()
             else:
-                body_content = msg.get_content()
+                if msg.get_content_type() == 'text/plain': text_part = msg.get_content()
+                else: html_part = msg.get_content()
 
-            if body_content:
-                clean_body = body_content
+            # Prioritize Text > HTML > Regex Cleaned HTML
+            if text_part:
+                clean_body = text_part
+            elif html_part:
+                # Remove HTML tags if no plain text found
+                clean_body = re.sub('<[^<]+?>', '', html_part)
 
-        except Exception as e:
-            print(f"Parsing error: {e}")
-            # If parsing fails, stick to raw body
+        except Exception: pass
         
-        data['body'] = clean_body
-        # --- EMAIL PARSING LOGIC END ---
+        data['body'] = clean_body.strip()
+        # --- CLEANER LOGIC END ---
 
         data['timestamp'] = now
         recipient = data.get('recipient')
-        
         if recipient:
-            if recipient not in user_inboxes:
-                user_inboxes[recipient] = []
-            
+            if recipient not in user_inboxes: user_inboxes[recipient] = []
             user_inboxes[recipient].append(data)
-            
-            # Keep max 50 emails per user
-            if len(user_inboxes[recipient]) > 50:
-                user_inboxes[recipient].pop(0)
+            if len(user_inboxes[recipient]) > 50: user_inboxes[recipient].pop(0)
             
     return jsonify({"status": "received"}), 200
 
