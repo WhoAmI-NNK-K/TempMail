@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime
 import email
 from email.policy import default
-import re
 
 app = Flask(__name__)
 
@@ -25,27 +24,28 @@ HTML_PAGE = """
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .otp-badge { background: #facc15; color: black; padding: 2px 6px; border-radius: 4px; font-weight: 800; border: 1px solid #eab308; display: inline-block; cursor: pointer; margin: 0 2px; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Iframe Responsive Fix */
+        #email-frame { width: 100%; height: 100%; border: none; background: white; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300 overflow-hidden">
 
     <div class="bg-white dark:bg-slate-800 p-4 shadow-sm z-20 flex justify-between items-center px-4 safe-area-top">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-lg">B</div>
+            <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-lg">B</div>
             <div>
                 <h1 class="font-bold text-lg leading-tight">Inbox</h1>
-                <p class="text-[10px] text-green-500 font-mono flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live</p>
+                <p class="text-[10px] text-green-500 font-mono flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Gmail Mode</p>
             </div>
         </div>
         <div class="flex gap-3">
-             <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center transition hover:bg-gray-200 dark:hover:bg-slate-600">
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center transition">
                 <i class="fa-solid fa-moon dark:hidden"></i><i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
             </button>
-            <button onclick="openHistory()" class="relative w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center transition hover:bg-gray-200 dark:hover:bg-slate-600">
-                <i class="fa-solid fa-layer-group text-blue-500"></i>
+            <button onclick="openHistory()" class="relative w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center transition">
+                <i class="fa-solid fa-clock-rotate-left text-blue-500"></i>
                 <span id="total-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] min-w-[18px] h-[18px] flex items-center justify-center rounded-full hidden shadow-sm border-2 border-white dark:border-slate-800">0</span>
             </button>
         </div>
@@ -54,7 +54,7 @@ HTML_PAGE = """
     <div class="flex-1 overflow-y-auto pb-24 px-4 pt-4 hide-scrollbar" id="main-scroll">
         
         <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-lg border border-gray-100 dark:border-slate-700 mb-6 relative overflow-hidden group">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
             
             <div class="flex justify-between items-center mb-2">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Address</label>
@@ -78,26 +78,36 @@ HTML_PAGE = """
         <div id="inbox" class="space-y-3 pb-10">
             <div class="text-center py-10 opacity-40">
                 <i class="fa-regular fa-envelope-open text-5xl mb-3"></i>
-                <p class="text-sm">No messages yet</p>
+                <p class="text-sm">Waiting for emails...</p>
             </div>
         </div>
     </div>
 
     <div id="read-modal" class="fixed inset-0 z-50 hidden">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="closeReadModal()"></div>
-        <div id="read-content-box" class="absolute bottom-0 left-0 w-full h-[90vh] bg-white dark:bg-slate-900 rounded-t-3xl shadow-2xl flex flex-col transform transition-transform duration-300 translate-y-full">
-            <div class="p-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-10 rounded-t-3xl">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeReadModal()"></div>
+        <div id="read-content-box" class="absolute bottom-0 left-0 w-full h-[95vh] bg-white dark:bg-slate-900 rounded-t-3xl shadow-2xl flex flex-col transform transition-transform duration-300 translate-y-full">
+            
+            <div class="p-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-10 rounded-t-3xl">
                 <button onclick="closeReadModal()" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-slate-700 transition"><i class="fa-solid fa-chevron-down text-gray-500"></i></button>
-                <span class="font-bold text-sm">Message</span>
+                <span class="font-bold text-sm">Full Email View</span>
                 <div class="w-8"></div>
             </div>
-            <div class="flex-1 overflow-y-auto p-6 pb-20">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xl" id="read-avatar">A</div>
-                    <div><h3 id="read-sender" class="font-bold text-lg leading-tight">Sender</h3><p id="read-date" class="text-xs text-gray-400 mt-1">Date</p></div>
+
+            <div class="flex-1 overflow-hidden flex flex-col bg-white">
+                <div class="p-4 border-b border-gray-100 shrink-0">
+                    <h2 id="read-subject" class="text-lg font-bold mb-1 text-slate-800 leading-tight">Subject</h2>
+                    <div class="flex items-center gap-2">
+                         <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs" id="read-avatar">A</div>
+                         <div>
+                             <p id="read-sender" class="font-bold text-sm text-slate-700 truncate max-w-[200px]">Sender</p>
+                             <p id="read-date" class="text-[10px] text-gray-400">Date</p>
+                         </div>
+                    </div>
                 </div>
-                <h2 id="read-subject" class="text-xl font-bold mb-6 text-slate-800 dark:text-white leading-snug">Subject</h2>
-                <div class="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-700 font-mono text-sm leading-relaxed text-slate-600 dark:text-slate-300 overflow-x-auto whitespace-pre-wrap" id="read-body">Body</div>
+                
+                <div class="flex-1 relative w-full bg-white">
+                    <iframe id="email-frame" sandbox="allow-same-origin" class="absolute inset-0 w-full h-full"></iframe>
+                </div>
             </div>
         </div>
     </div>
@@ -113,18 +123,18 @@ HTML_PAGE = """
     </div>
 
     <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-3 transition-all duration-300 opacity-0 -translate-y-10 pointer-events-none">
-        <i class="fa-solid fa-circle-check text-green-400"></i> <span id="toast-msg">OK</span>
+        <span id="toast-msg">OK</span>
     </div>
 
     <script>
         const DOMAIN = "buffaloadmin.online";
         let currentEmail = "";
-        let emailHistory = JSON.parse(localStorage.getItem("buffalo_hist_v5")) || [];
-        let msgCounts = JSON.parse(localStorage.getItem("buffalo_counts_v5")) || {};
+        let emailHistory = JSON.parse(localStorage.getItem("buffalo_hist_v8")) || [];
+        let msgCounts = JSON.parse(localStorage.getItem("buffalo_counts_v8")) || {};
 
         function init() {
             if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark');
-            const saved = localStorage.getItem("buffalo_active");
+            const saved = localStorage.getItem("buffalo_active_v8");
             if (saved) { switchAccount(saved, false); } else { generateNewEmail(); }
             setInterval(() => { if(currentEmail) fetchEmails(true); }, 3000);
         }
@@ -138,19 +148,19 @@ HTML_PAGE = """
 
         function switchAccount(email, saveHist = true) {
             currentEmail = email;
-            localStorage.setItem("buffalo_active", email);
+            localStorage.setItem("buffalo_active_v8", email);
             document.getElementById("current-email").innerText = email;
             document.getElementById("inbox").innerHTML = `
                 <div class="text-center py-20 animate-pulse">
-                    <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-satellite-dish text-2xl text-blue-500"></i></div>
-                    <p class="text-sm text-gray-500">Syncing...</p>
+                     <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-satellite-dish text-2xl text-blue-500"></i></div>
+                    <p class="text-sm text-gray-500">Connecting...</p>
                 </div>`;
             document.getElementById("msg-count").innerText = "0";
             
             if (saveHist) {
                 if (!emailHistory.includes(email)) emailHistory.unshift(email);
                 if (emailHistory.length > 20) emailHistory.pop();
-                localStorage.setItem("buffalo_hist_v5", JSON.stringify(emailHistory));
+                localStorage.setItem("buffalo_hist_v8", JSON.stringify(emailHistory));
             }
             closeHistory(); fetchEmails(false);
         }
@@ -166,26 +176,26 @@ HTML_PAGE = """
                 
                 document.getElementById("msg-count").innerText = data.length;
                 msgCounts[currentEmail] = data.length;
-                localStorage.setItem("buffalo_counts_v5", JSON.stringify(msgCounts));
+                localStorage.setItem("buffalo_counts_v8", JSON.stringify(msgCounts));
                 updateHistoryBadges();
 
                 const inbox = document.getElementById("inbox");
                 if (data.length > 0) {
-                    inbox.innerHTML = data.reverse().map((msg) => {
+                    inbox.innerHTML = data.reverse().map((msg, index) => {
                         const safeSender = msg.sender.replace(/'/g, "&apos;");
                         const safeSubject = msg.subject.replace(/'/g, "&apos;");
-                        const safeBody = encodeURIComponent(msg.body);
-                        let preview = msg.body.substring(0, 50) + (msg.body.length > 50 ? "..." : "");
+                        // Store full HTML content safely
+                        const safeHtml = encodeURIComponent(msg.html_content || msg.body);
                         
                         return `
-                        <div onclick="openReadModal('${safeSender}', '${safeSubject}', '${safeBody}', '${msg.timestamp}')" 
+                        <div onclick="openReadModal('${safeSender}', '${safeSubject}', '${safeHtml}', '${msg.timestamp}')" 
                             class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 relative overflow-hidden group active:scale-[0.98] transition cursor-pointer hover:shadow-md">
                             <div class="flex justify-between items-start mb-1">
                                 <div class="font-bold text-sm text-slate-800 dark:text-slate-100 truncate w-[70%]">${msg.sender}</div>
                                 <span class="text-[10px] text-gray-400 font-mono">${msg.timestamp}</span>
                             </div>
                             <div class="font-bold text-blue-600 dark:text-blue-400 text-sm mb-1 truncate">${msg.subject}</div>
-                            <div class="text-xs text-gray-500 dark:text-slate-400 truncate font-mono">${preview}</div>
+                            <div class="text-xs text-gray-500 dark:text-slate-400 truncate">Tap to open email</div>
                         </div>`;
                     }).join("");
                 } else if (!silent) {
@@ -195,19 +205,18 @@ HTML_PAGE = """
             if(!silent) setTimeout(() => icon.classList.remove("fa-spin"), 500);
         }
 
-        function openReadModal(sender, subject, encodedBody, date) {
-            const body = decodeURIComponent(encodedBody);
+        function openReadModal(sender, subject, encodedHtml, date) {
+            const htmlContent = decodeURIComponent(encodedHtml);
+            
             document.getElementById("read-sender").innerText = sender;
             document.getElementById("read-avatar").innerText = sender.charAt(0).toUpperCase();
             document.getElementById("read-subject").innerText = subject;
             document.getElementById("read-date").innerText = date;
             
-            // Smart OTP Highlight & Line Break Fix
-            let formattedBody = body.replace(/</g, "&lt;");
-            formattedBody = formattedBody.replace(/\\b\\d{4,8}\\b/g, match => `<span class="otp-badge" onclick="copyText('${match}', event)">${match}</span>`);
-            formattedBody = formattedBody.replace(/\\n/g, "<br>");
+            // Inject into Iframe to render like native Gmail
+            const iframe = document.getElementById("email-frame");
+            iframe.srcdoc = htmlContent;
             
-            document.getElementById("read-body").innerHTML = formattedBody;
             const modal = document.getElementById("read-modal");
             const box = document.getElementById("read-content-box");
             modal.classList.remove("hidden");
@@ -246,7 +255,7 @@ HTML_PAGE = """
             document.getElementById("history-panel").classList.add("translate-y-full");
             setTimeout(() => { document.getElementById("history-overlay").classList.add("hidden"); }, 300);
         }
-
+        
         function updateHistoryBadges() {
             let total = 0; emailHistory.forEach(e => { if(msgCounts[e]) total += msgCounts[e]; });
             const badge = document.getElementById("total-badge");
@@ -254,11 +263,10 @@ HTML_PAGE = """
             else { badge.classList.add("hidden"); }
         }
 
-        function clearHistory() { if(confirm("Clear history?")) { emailHistory = []; msgCounts = {}; localStorage.removeItem("buffalo_hist_v5"); localStorage.removeItem("buffalo_counts_v5"); closeHistory(); }}
+        function clearHistory() { if(confirm("Clear history?")) { emailHistory = []; msgCounts = {}; localStorage.removeItem("buffalo_hist_v8"); localStorage.removeItem("buffalo_counts_v8"); closeHistory(); }}
         function manualRefresh() { fetchEmails(); }
         function toggleTheme() { if (document.documentElement.classList.contains('dark')) { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); } else { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); }}
         function copyEmail() { navigator.clipboard.writeText(currentEmail); showToast("Copied!"); }
-        function copyText(txt, e) { e.stopPropagation(); navigator.clipboard.writeText(txt); showToast("Code Copied!"); }
         function showToast(msg) { const t = document.getElementById("toast"); document.getElementById("toast-msg").innerText = msg; t.classList.remove("opacity-0", "-translate-y-10"); setTimeout(() => t.classList.add("opacity-0", "-translate-y-10"), 2000); }
 
         init();
@@ -278,38 +286,35 @@ def webhook():
         now = datetime.now().strftime("%H:%M")
         raw_body = data.get('body', '')
         
-        # --- CLEANER LOGIC START ---
-        clean_body = raw_body
+        # --- GMAIL-STYLE PARSER ---
+        # HTML ကို ဦးစားပေးပြီး သီးသန့်ခွဲထုတ်မယ်
+        html_content = ""
+        text_content = ""
+        
         try:
             msg = email.message_from_string(raw_body, policy=default)
             if msg['subject']: data['subject'] = msg['subject']
             
-            text_part = ""
-            html_part = ""
-
             if msg.is_multipart():
                 for part in msg.walk():
                     ctype = part.get_content_type()
-                    cdispo = str(part.get('Content-Disposition'))
-                    if 'attachment' in cdispo: continue
-                    
-                    if ctype == 'text/plain': text_part = part.get_content()
-                    elif ctype == 'text/html': html_part = part.get_content()
+                    # HTML အပိုင်းကို ရှာပြီး သိမ်းမယ်
+                    if ctype == 'text/html':
+                        html_content = part.get_content()
+                    elif ctype == 'text/plain':
+                        text_content = part.get_content()
             else:
-                if msg.get_content_type() == 'text/plain': text_part = msg.get_content()
-                else: html_part = msg.get_content()
-
-            # Prioritize Text > HTML > Regex Cleaned HTML
-            if text_part:
-                clean_body = text_part
-            elif html_part:
-                # Remove HTML tags if no plain text found
-                clean_body = re.sub('<[^<]+?>', '', html_part)
+                if msg.get_content_type() == 'text/html':
+                    html_content = msg.get_content()
+                else:
+                    text_content = msg.get_content()
 
         except Exception: pass
         
-        data['body'] = clean_body.strip()
-        # --- CLEANER LOGIC END ---
+        # HTML ရှိရင် HTML ကို Frontend ပို့မယ်၊ မရှိရင် Text ကို ပို့မယ်
+        data['html_content'] = html_content if html_content else text_content
+        data['body'] = text_content if text_content else "Open to view content"
+        # ---------------------------
 
         data['timestamp'] = now
         recipient = data.get('recipient')
